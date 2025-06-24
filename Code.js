@@ -27,8 +27,26 @@ function checkStudentSubmissions() {
       return; // Stop the script if we can't get coursework
     }
 
+    let coursework;
+    try {
+      coursework = Classroom.Courses.CourseWork.list(COURSE_ID).courseWork;
+    } catch (courseworkError) {
+      Logger.log('Error listing coursework: ' + courseworkError.toString());
+      MailApp.sendEmail(
+        YOUR_EMAIL,
+        "Google Classroom Script Error",
+        "An error occurred listing coursework: " + courseworkError.toString()
+      );
+      return; // Stop the script if we can't get coursework
+    }
+
     if (!coursework || coursework.length === 0) {
       Logger.log('No coursework found for this course.');
+      MailApp.sendEmail(
+        YOUR_EMAIL,
+        "Google Classroom Script - No Coursework",
+        "No coursework was found for course ID: " + COURSE_ID
+      );
       MailApp.sendEmail(
         YOUR_EMAIL,
         "Google Classroom Script - No Coursework",
@@ -48,6 +66,11 @@ function checkStudentSubmissions() {
         "Google Classroom Script - No Students",
         "No students were found for course ID: " + COURSE_ID
       );
+      MailApp.sendEmail(
+        YOUR_EMAIL,
+        "Google Classroom Script - No Students",
+        "No students were found for course ID: " + COURSE_ID
+      );
       return;
     }
 
@@ -55,6 +78,21 @@ function checkStudentSubmissions() {
       let allAssignmentsCompletedForStudent = true; // Assume true, then prove false
 
       coursework.forEach(assignment => {
+        Logger.log(`Checking assignment: ${assignment.title} (${assignment.id})`); // Log assignment ID
+        let submissions;
+        try {
+          submissions = Classroom.Courses.CourseWork.StudentSubmissions.list(
+            COURSE_ID,
+            assignment.id
+          ).studentSubmissions;
+        } catch (submissionError) {
+          Logger.log(`Error getting submissions for assignment ${assignment.id}: ${submissionError.toString()}`);
+          // If we can't get submissions for *one* assignment, we can't definitively say
+          // the student has completed *all* assignments.  We'll log the error and
+          // treat this assignment as not completed.
+          allAssignmentsCompletedForStudent = false;  // Treat this assignment as not completed
+          return; // Skip to the next assignment
+        }
         Logger.log(`Checking assignment: ${assignment.title} (${assignment.id})`); // Log assignment ID
         let submissions;
         try {
@@ -117,6 +155,13 @@ function checkStudentSubmissions() {
 // 9. Click the "Run" button (play icon).
 // 10. The first time you run it, you will be prompted to authorize the script. Follow the prompts.
 // 11. To automate this to run every 4 hours:
+//    - In the left sidebar of the Apps Script editor, click on "Triggers" (clock icon).
+//    - Click "Add Trigger".
+//    - Choose `checkStudentSubmissions` for "Choose which function to run".
+//    - Choose "Head" for "Choose which deployment should run".
+//    - Select "Time-driven" for "Select event source".
+//    - Choose "Hour timer" and then "Every 4 hours".
+//    - Click "Save".
 //    - In the left sidebar of the Apps Script editor, click on "Triggers" (clock icon).
 //    - Click "Add Trigger".
 //    - Choose `checkStudentSubmissions` for "Choose which function to run".
